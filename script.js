@@ -1,146 +1,172 @@
-var r = document.querySelector(":root");
-var colors = document.getElementsByName("colors");
-function getColor() {
-  for (i = 0; i < colors.length; i++) {
-    if (colors[i].checked) r.className = colors[i].value;
-  } 
+var scanlines = $('.scanlines');
+var tv = $('.tv');
+function exit() {
+    $('.tv').addClass('collapse');
+    term.disable();
 }
 
+// ref: https://stackoverflow.com/q/67322922/387194
+var __EVAL = (s) => eval(`void (__EVAL = ${__EVAL}); ${s}`);
 
-function pipAmber() {
-  r.style.setProperty("--main", "255, 170, 60");
-  r.style.setProperty("--alt", "120, 75, 20");
-  r.className = "amber";
-}
-
-function pipRed() {
-  r.style.setProperty("--main", "255,40,0");
-  r.style.setProperty("--alt", "160,20,0");
-  r.className = "red";
-}
-
-function pipGreen() {
-  r.style.setProperty("--main", "0,230,50");
-  r.style.setProperty("--alt", "0,160,30");
-  r.className = "green";
-}
-
-function pipWhite() {
-  r.style.setProperty("--main", "220,220,220");
-  r.style.setProperty("--alt", "100,100,100");
-  r.className = "white";
-}
-
-function pipBlack() {
-  r.style.setProperty("--main", "200,220,250");
-  r.style.setProperty("--alt", "90,100,150");
-  r.className = "black";
-}
-
-/*-- This JS is just for the cursor. Definitely could have written something simpler/more efficient but this is mostly copied code. May revisit later. --*/
-
-let dots = [],
-  mouse = {
-    x: 0,
-    y: 0
-  };
-
-let Dot = function () {
-  this.x = 0;
-  this.y = 0;
-  this.node = (function () {
-    let n = document.createElement("div");
-    n.className = "cursor";
-    document.body.appendChild(n);
-    return n;
-  })();
-};
-Dot.prototype.draw = function () {
-  this.node.style.left = this.x + "px";
-  this.node.style.top = this.y + "px";
-};
-
-for (let i = 0; i < 1; i++) {
-  let d = new Dot();
-  dots.push(d);
-}
-
-function draw() {
-  let x = mouse.x,
-    y = mouse.y;
-
-  dots.forEach(function (dot, index, dots) {
-    let nextDot = dots[index + 1] || dots[0];
-
-    dot.x = x;
-    dot.y = y;
-    dot.draw();
-    x += (nextDot.x - dot.x) * 0.4;
-    y += (nextDot.y - dot.y) * 0.4;
-  });
-}
-
-addEventListener("mousemove", function (event) {
-  mouse.x = event.pageX;
-  mouse.y = event.pageY;
+var term = $('#terminal').terminal(function(command, term) {
+    var cmd = $.terminal.parse_command(command);
+    if (cmd.name === 'exit') {
+        exit();
+    } else if (cmd.name === 'echo') {
+        term.echo(cmd.rest);
+    } else if (command !== '') {
+        try {
+            var result = __EVAL(command);
+            if (result && result instanceof $.fn.init) {
+                term.echo('<#jQuery>');
+            } else if (result && typeof result === 'object') {
+                tree(result);
+            } else if (result !== undefined) {
+                term.echo(new String(result));
+            }
+        } catch(e) {
+            term.error(new String(e));
+        }
+    }
+}, {
+    name: 'js_demo',
+    onResize: set_size,
+    exit: false,
+    // detect iframe codepen preview
+    enabled: $('body').attr('onload') === undefined,
+    onInit: function() {
+        set_size();
+        this.echo('Type [[b;#fff;]exit] to see turn off animation.');
+        this.echo('Type and execute [[b;#fff;]grab()] function to get the scre' +
+                  'enshot from your camera');
+        this.echo('Type [[b;#fff;]camera()] to get video and [[b;#fff;]pause()]/[[b;#fff;]play()] to stop/play');
+    },
+    onClear: function() {
+        console.log(this.find('video').length);
+        this.find('video').map(function() {
+            console.log(this.src);
+            return this.src;
+        });
+    },
+    prompt: 'js> '
 });
-
-function animate() {
-  draw();
-  requestAnimationFrame(animate);
+// for codepen preview
+if (!term.enabled()) {
+    term.find('.cursor').addClass('blink');
+}
+function set_size() {
+    // for window height of 170 it should be 2s
+    var height = $(window).height();
+    var width = $(window).width()
+    var time = (height * 2) / 170;
+    scanlines[0].style.setProperty("--time", time);
+    tv[0].style.setProperty("--width", width);
+    tv[0].style.setProperty("--height", height);
 }
 
-animate();
+function tree(obj) {
+    term.echo(treeify.asTree(obj, true, true));
+}
+var constraints = {
+    audio: false,
+    video: {
+        width: { ideal: 1280 },
+        height: { ideal: 1024 },
+        facingMode: "environment"
+    }
+};
+var acceptStream = (function() {
+    return 'srcObject' in document.createElement('video');
+})();
+function camera() {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        term.pause();
+        var media = navigator.mediaDevices.getUserMedia(constraints);
+        media.then(function(mediaStream) {
+            term.resume();
+            var stream;
+            if (!acceptStream) {
+                stream = window.URL.createObjectURL(mediaStream);
+            } else {
+                stream = mediaStream;
+            }
+            term.echo('<video data-play="true" class="self"></video>', {
+                raw: true,
+                onClear: function() {
+                    if (!acceptStream) {
+                        URL.revokeObjectURL(stream);
+                    }
+                    mediaStream.getTracks().forEach(track => track.stop());
+                },
+                finalize: function(div) {
+                    var video = div.find('video');
+                    if (!video.length) {
+                        return;
+                    }
+                    if (acceptStream) {
+                        video[0].srcObject = stream;
+                    } else {
+                        video[0].src = stream;
+                    }
+                    if (video.data('play')) {
+                        video[0].play();
+                    }
+                }
+            });
+        });
+    }
+}
+var play = function() {
+    var video = term.find('video').slice(-1);
+    if (video.length) {
+        video[0].play();
+    }
+}
+function pause() {
+    term.find('video').each(function() {
+        this.pause(); 
+    });
+}
 
-document.addEventListener("DOMContentLoaded", function () {
-  var cursor = document.querySelector(".cursor");
-  var links = document.querySelectorAll(
-    'a, button, label, input[type="button"], input[type="submit"]'
-  );
-  var inputs = document.querySelectorAll("input, textarea");
-  var showcur = document.querySelectorAll(".frame");
-
-  var i = links.length;
-  for (i = 0; i < links.length; i++) {
-    links[i].addEventListener("mouseenter", addCursor);
-    links[i].addEventListener("mouseleave", removeCursor);
+function grab() {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        term.pause();
+        var media = navigator.mediaDevices.getUserMedia(constraints);
+        media.then(function(mediaStream) {
+            const mediaStreamTrack = mediaStream.getVideoTracks()[0];
+            const imageCapture = new ImageCapture(mediaStreamTrack);
+            return imageCapture.takePhoto();
+        }).then(function(blob) {
+            term.echo('<img src="' + URL.createObjectURL(blob) + '" class="self"/>', {
+                raw: true,
+                finialize: function(div) {
+                    div.find('img').on('load', function() {
+                        URL.revokeObjectURL(this.src);
+                    });
+                }
+            }).resume();
+        }).catch(function(error) {
+            term.error('Device Media Error: ' + error);
+        });
+    }
+}
+async function pictuteInPicture() {
+    var [video] = $('video');
+    try {
+        if (video) {
+            if (video !== document.pictureInPictureElement) {
+                await video.requestPictureInPicture();
+            } else {
+                await document.exitPictureInPicture();
+            }
+        }
+  } catch(error) {
+      term.error(error);
   }
+}
+function clear() {
+    term.clear();
+}
 
-  var i = inputs.length;
-  for (i = 0; i < inputs.length; i++) {
-    inputs[i].addEventListener("mouseenter", addInput);
-    inputs[i].addEventListener("mouseleave", removeInput);
-  }
-
-  var i = showcur.length;
-  for (i = 0; i < showcur.length; i++) {
-    showcur[i].addEventListener("mouseenter", addShow);
-    showcur[i].addEventListener("mouseleave", removeShow);
-  }
-
-  function addInput() {
-    cursor.classList.add("cursor-input");
-  }
-
-  function removeInput() {
-    cursor.classList.remove("cursor-input");
-  }
-
-  function addCursor() {
-    cursor.classList.remove("cursor-default");
-    cursor.classList.add("cursor-active");
-  }
-
-  function removeCursor() {
-    cursor.classList.remove("cursor-active");
-    cursor.classList.add("cursor-default");
-  }
-
-  function addShow() {
-    cursor.classList.add("cursor-default");
-  }
-
-  function removeShow() {
-    cursor.classList.remove("cursor-default");
-  }
-});
+github('jcubic/jquery.terminal');
+cssVars(); // ponyfill
