@@ -24,12 +24,12 @@
         span,
         .cmd,
         div {
-            --color: rgba(0, 128, 0, 0.99);
+            --color: rgba(238, 238, 238, 0.8);
         }
   
         .terminal,
         span {
-            --size: 1.4;
+            --size: ;
         }
     </style>
 </head>
@@ -39,20 +39,16 @@
         $('body').terminal({
             iam: function (name) {
                 this.echo('Hello, ' + name +
-                    '. Welcome to GeeksForGeeks');
+                    '. My name is Pritish Prusty');
             },
             founder: function () {
                 this.echo('Sandeep Jain');
             },
             help: function () {
-                this.echo('iam - iam command and '
-                + 'pass your name as argument\n'
-                + 'founder to know the founder');
+                this.echo('Type skill to know about the skills I have \nType Projects to learn about the projects I worked on');
             },
         }, {
-            greetings: 'GeeksForGeeks - A place to'
-                + ' learn DS, Algo and Computer '
-                + 'Science for free'
+            greetings: 'Hey there, I\'m Pritish Prusty. \n An enthusiastic Data scientist student and has a knack for blockchain. This is an interactive terminal where you can get to know about me. \n Please type \"help\" to know more'
         });
     </script>
 </body>
