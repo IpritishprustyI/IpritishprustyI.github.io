@@ -6,7 +6,7 @@ function getColor() {
   } 
 }
 
-/*
+
 function pipAmber() {
   r.style.setProperty("--main", "255, 170, 60");
   r.style.setProperty("--alt", "120, 75, 20");
@@ -35,7 +35,7 @@ function pipBlack() {
   r.style.setProperty("--main", "200,220,250");
   r.style.setProperty("--alt", "90,100,150");
   r.className = "black";
-}*/
+}
 
 /*-- This JS is just for the cursor. Definitely could have written something simpler/more efficient but this is mostly copied code. May revisit later. --*/
 
